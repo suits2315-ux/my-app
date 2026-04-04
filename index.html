@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>家計簿アプリ</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont;
+      background-color: #0d0d0d;
+      color: #fff;
+      margin: 0;
+      padding: 16px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #b266ff;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 6px 0;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+    }
+
+    input, select {
+      background: #1a1a1a;
+      color: #fff;
+    }
+
+    button {
+      background: #7a33cc;
+      color: white;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #9a66ff;
+    }
+
+    .card {
+      background: #1a1a1a;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 10px;
+    }
+
+    .total {
+      font-size: 18px;
+      margin-top: 12px;
+      color: #b266ff;
+    }
+  </style>
+</head>
+<body>
+
+<h1>家計簿</h1>
+
+<input type="date" id="date">
+<input type="number" id="amount" placeholder="金額（¥）">
+
+<select id="category">
+  <option>食品・日用品</option>
+  <option>家族との外食や娯楽費用</option>
+  <option>個人使用</option>
+  <option>エマ費用</option>
+</select>
+
+<button onclick="addData()">追加</button>
+
+<div class="total" id="total"></div>
+<div id="list"></div>
+
+<script>
+let data = JSON.parse(localStorage.getItem("kakeibo")) || [];
+
+function addData() {
+  const date = document.getElementById("date").value;
+  const amount = parseInt(document.getElementById("amount").value);
+  const category = document.getElementById("category").value;
+
+  if (!date || !amount) return;
+
+  data.push({ date, amount, category });
+  localStorage.setItem("kakeibo", JSON.stringify(data));
+  render();
+}
+
+function render() {
+  const list = document.getElementById("list");
+  const totalEl = document.getElementById("total");
+
+  list.innerHTML = "";
+
+  let total = 0;
+
+  data.forEach((item, index) => {
+    total += item.amount;
+
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `
+      ${item.date} / ¥${item.amount} / ${item.category}
+      <button onclick="remove(${index})">削除</button>
+    `;
+    list.appendChild(div);
+  });
+
+  totalEl.innerText = "合計: ¥" + total;
+}
+
+function remove(index) {
+  data.splice(index, 1);
+  localStorage.setItem("kakeibo", JSON.stringify(data));
+  render();
+}
+
+render();
+</script>
+
+</body>
+</html>
