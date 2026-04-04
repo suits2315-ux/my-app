@@ -1,123 +1,167 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>家計簿アプリ</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont;
-      background-color: #0d0d0d;
-      color: #fff;
-      margin: 0;
-      padding: 16px;
-    }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>家計簿アプリ</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 16px; background:#0f0f14; color:#eee; }
+h2 { margin-bottom: 10px; }
+input, select, button {
+  width: 100%;
+  padding: 12px;
+  margin: 6px 0;
+  border-radius: 8px;
+  border: 1px solid #333;
+  font-size: 16px;
+  background:#1a1a24;
+  color:#eee;
+}
+button { background: #6c3cff; color: white; border: none; }
+.container { max-width: 420px; margin: auto; }
+.card { background: #1a1a24; padding: 12px; margin-top: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(108,60,255,0.2); }
+ul { padding-left: 18px; }
+.total { font-size:18px; margin-top:10px; }
+.delete-btn { background:#ff4d6d; margin-left:10px; padding:4px 8px; font-size:12px; }
 
-    h1 {
-      text-align: center;
-      color: #b266ff;
-    }
+/* フォーカス時の視認性改善 */
+input:focus, select:focus {
+  outline: none;
+  border-color: #9b6cff;
+  color: #c3a6ff;
+  caret-color: #c3a6ff;
+}
 
-    input, select, button {
-      width: 100%;
-      padding: 10px;
-      margin: 6px 0;
-      border-radius: 8px;
-      border: none;
-      font-size: 16px;
-    }
-
-    input, select {
-      background: #1a1a1a;
-      color: #fff;
-    }
-
-    button {
-      background: #7a33cc;
-      color: white;
-      font-weight: bold;
-    }
-
-    button:hover {
-      background: #9a66ff;
-    }
-
-    .card {
-      background: #1a1a1a;
-      padding: 12px;
-      margin-top: 10px;
-      border-radius: 10px;
-    }
-
-    .total {
-      font-size: 18px;
-      margin-top: 12px;
-      color: #b266ff;
-    }
-  </style>
+/* プレースホルダーも少し柔らかく */
+input::placeholder {
+  color: #777;
+}
+</style>
 </head>
 <body>
 
-<h1>家計簿</h1>
+<div class="container">
+<h2>家計簿</h2>
 
-<input type="date" id="date">
-<input type="number" id="amount" placeholder="金額（¥）">
+<input type="month" id="monthPicker" />
+
+<input type="date" id="date" />
+<input type="number" id="amount" placeholder="金額（¥）" />
 
 <select id="category">
-  <option>食品・日用品</option>
-  <option>家族との外食や娯楽費用</option>
-  <option>個人使用</option>
-  <option>エマ費用</option>
+<option value="食品・日用品">食品・日用品</option>
+<option value="家族との外食や娯楽費用">家族との外食や娯楽費用</option>
+<option value="個人使用">個人使用</option>
+<option value="エマ費用">エマ費用</option>
 </select>
 
-<button onclick="addData()">追加</button>
+<button onclick="addRecord()">追加</button>
 
-<div class="total" id="total"></div>
-<div id="list"></div>
+<div class="card">
+<h3>今月の合計</h3>
+<div id="monthlyTotal" class="total"></div>
+</div>
+
+<div class="card">
+<h3>履歴</h3>
+<ul id="list"></ul>
+</div>
+
+<div class="card">
+<h3>カテゴリ別支出</h3>
+<canvas id="chart"></canvas>
+</div>
+
+</div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("kakeibo")) || [];
+let records = JSON.parse(localStorage.getItem('records')) || [];
+let selectedMonth = new Date();
 
-function addData() {
-  const date = document.getElementById("date").value;
-  const amount = parseInt(document.getElementById("amount").value);
-  const category = document.getElementById("category").value;
+function save() { localStorage.setItem('records', JSON.stringify(records)); }
 
-  if (!date || !amount) return;
+function addRecord() {
+  const date = document.getElementById('date').value;
+  const amount = Number(document.getElementById('amount').value);
+  const category = document.getElementById('category').value;
 
-  data.push({ date, amount, category });
-  localStorage.setItem("kakeibo", JSON.stringify(data));
+  if (!date || !amount) { alert("日付と金額を入力してください"); return; }
+
+  records.push({ date, amount, category });
+  save();
+  render();
+}
+
+function deleteRecord(index) {
+  records.splice(index, 1);
+  save();
   render();
 }
 
 function render() {
-  const list = document.getElementById("list");
-  const totalEl = document.getElementById("total");
+  const list = document.getElementById('list');
+  list.innerHTML = '';
 
-  list.innerHTML = "";
+  const categoryTotals = {};
+  let monthlyTotal = 0;
 
-  let total = 0;
+  const year = selectedMonth.getFullYear();
+  const month = selectedMonth.getMonth();
 
-  data.forEach((item, index) => {
-    total += item.amount;
+  records.forEach((r, i) => {
+    const recordDate = new Date(r.date);
 
-    const div = document.createElement("div");
-    div.className = "card";
-    div.innerHTML = `
-      ${item.date} / ¥${item.amount} / ${item.category}
-      <button onclick="remove(${index})">削除</button>
-    `;
-    list.appendChild(div);
+    if (recordDate.getFullYear() === year && recordDate.getMonth() === month) {
+      const li = document.createElement('li');
+
+      // 日付を yyyy/mm/dd に整形
+      const d = new Date(r.date);
+      const formattedDate = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+
+      li.innerHTML = `${formattedDate} ${r.category} -¥${r.amount.toLocaleString()} <button class='delete-btn' onclick='deleteRecord(${i})'>削除</button>`;
+      list.appendChild(li);
+
+      monthlyTotal += r.amount;
+
+      if (!categoryTotals[r.category]) categoryTotals[r.category] = 0;
+      categoryTotals[r.category] += r.amount;
+    }
   });
 
-  totalEl.innerText = "合計: ¥" + total;
+  document.getElementById('monthlyTotal').textContent = `¥${monthlyTotal.toLocaleString()}`;
+
+  drawChart(categoryTotals);
 }
 
-function remove(index) {
-  data.splice(index, 1);
-  localStorage.setItem("kakeibo", JSON.stringify(data));
-  render();
+let chart;
+function drawChart(categoryTotals) {
+  const ctx = document.getElementById('chart').getContext('2d');
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: Object.keys(categoryTotals),
+      datasets: [{
+        data: Object.values(categoryTotals),
+        backgroundColor: ['#6c3cff','#9b6cff','#c3a6ff','#4b2dbd']
+      }]
+    }
+  });
 }
+
+// 初期設定
+const now = new Date();
+document.getElementById('date').valueAsDate = now;
+document.getElementById('monthPicker').value = now.toISOString().slice(0,7);
+
+// 月変更イベント
+document.getElementById('monthPicker').addEventListener('change', (e) => {
+  selectedMonth = new Date(e.target.value);
+  render();
+});
 
 render();
 </script>
