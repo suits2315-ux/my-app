@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ToDoアプリ</title>
+<style>
+body {
+  font-family: sans-serif;
+  background: #0f0f14;
+  color: #fff;
+  padding: 20px;
+}
+h1 {
+  color: #c084fc;
+}
+input {
+  width: 70%;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+}
+button {
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: #7c3aed;
+  color: white;
+  cursor: pointer;
+}
+button:hover {
+  background: #a78bfa;
+}
+.task {
+  background: #1a1a22;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.done {
+  text-decoration: line-through;
+  color: #aaa;
+}
+.delete {
+  background: #ef4444;
+}
+</style>
+</head>
+<body>
+
+<h1>ToDoリスト</h1>
+
+<input id="taskInput" placeholder="やることを入力">
+<button onclick="addTask()">追加</button>
+
+<div id="taskList"></div>
+
+<script>
+function loadTasks() {
+  const tasks = JSON.parse(localStorage.getItem("todo") || "[]");
+  const list = document.getElementById("taskList");
+  list.innerHTML = "";
+
+  tasks.forEach((task, index) => {
+    const div = document.createElement("div");
+    div.className = "task";
+
+    div.innerHTML = `
+      <span onclick="toggleDone(${index})" class="${task.done ? 'done' : ''}">
+        ${task.text}
+      </span>
+      <button class="delete" onclick="deleteTask(${index})">削除</button>
+    `;
+
+    list.appendChild(div);
+  });
+}
+
+function addTask() {
+  const input = document.getElementById("taskInput");
+  if (!input.value) return;
+
+  const tasks = JSON.parse(localStorage.getItem("todo") || "[]");
+  tasks.push({ text: input.value, done: false });
+
+  localStorage.setItem("todo", JSON.stringify(tasks));
+  input.value = "";
+  loadTasks();
+}
+
+function toggleDone(index) {
+  const tasks = JSON.parse(localStorage.getItem("todo") || "[]");
+  tasks[index].done = !tasks[index].done;
+  localStorage.setItem("todo", JSON.stringify(tasks));
+  loadTasks();
+}
+
+function deleteTask(index) {
+  const tasks = JSON.parse(localStorage.getItem("todo") || "[]");
+  tasks.splice(index, 1);
+  localStorage.setItem("todo", JSON.stringify(tasks));
+  loadTasks();
+}
+
+loadTasks();
+</script>
+
+</body>
+</html>
