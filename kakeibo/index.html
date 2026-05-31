@@ -20,6 +20,8 @@ input:focus { outline: none; border-color: #9b6cff; color: #c3a6ff; caret-color:
 input::placeholder { color: #777; }
 .card { background: #1a1a24; padding: 12px; margin-top: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(108,60,255,0.2); }
 .total { font-size: 18px; margin-top: 8px; }
+.avg { font-size: 14px; margin-top: 6px; color: #aaa; }
+.avg span { color: #c3a6ff; font-weight: 600; }
 .day-block { padding: 10px 0; border-bottom: 1px solid #2a2a38; }
 .day-block:last-child { border-bottom: none; }
 .day-header {
@@ -51,6 +53,7 @@ input::placeholder { color: #777; }
   <div class="card">
     <h3>今月の合計</h3>
     <div id="monthlyTotal" class="total"></div>
+    <div id="dailyAvg" class="avg"></div>
   </div>
 
   <div class="card">
@@ -108,6 +111,15 @@ function render() {
 
   const monthlyTotal = filtered.reduce((s, r) => s + r.amount, 0);
   document.getElementById('monthlyTotal').textContent = `¥${monthlyTotal.toLocaleString()}`;
+
+  const dayCount = Object.keys(dayMap).length;
+  const avgEl = document.getElementById('dailyAvg');
+  if (dayCount > 0) {
+    const avg = Math.round(monthlyTotal / dayCount);
+    avgEl.innerHTML = `1日あたりの平均：<span>¥${avg.toLocaleString()}</span>（${dayCount}日分）`;
+  } else {
+    avgEl.textContent = '';
+  }
 
   const sortedDates = Object.keys(dayMap).sort((a, b) => b.localeCompare(a));
 
