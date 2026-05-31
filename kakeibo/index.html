@@ -10,29 +10,34 @@ body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
 .wrap { max-width: 420px; margin: auto; padding: 16px; background: #0f0f14; min-height: 100vh; color: #eee; }
 h2 { margin-bottom: 10px; font-size: 20px; }
 h3 { font-size: 15px; margin-bottom: 8px; color: #bbb; }
-input, button {
+input, .add-btn {
   width: 100%; padding: 12px; margin: 6px 0;
   border-radius: 8px; border: 1px solid #333;
   font-size: 16px; background: #1a1a24; color: #eee;
 }
-button { background: #6c3cff; color: white; border: none; cursor: pointer; }
+.add-btn { background: #6c3cff; color: white; border: none; cursor: pointer; }
 input:focus { outline: none; border-color: #9b6cff; color: #c3a6ff; caret-color: #c3a6ff; }
 input::placeholder { color: #777; }
 .card { background: #1a1a24; padding: 12px; margin-top: 12px; border-radius: 10px; box-shadow: 0 2px 8px rgba(108,60,255,0.2); }
 .total { font-size: 18px; margin-top: 8px; }
-.history-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 0; border-bottom: 1px solid #2a2a38; font-size: 14px;
+.day-block { padding: 10px 0; border-bottom: 1px solid #2a2a38; }
+.day-block:last-child { border-bottom: none; }
+.day-header {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 14px; color: #aaa; margin-bottom: 4px;
 }
-.history-item:last-child { border-bottom: none; }
+.day-total { font-weight: 600; color: #fff; font-size: 15px; }
+.detail-list { margin-top: 4px; padding-left: 4px; }
+.detail-item {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; color: #888; padding: 3px 0;
+}
 .del-btn {
   background: #ff4d6d; color: white; border: none;
-  padding: 4px 8px; font-size: 11px; border-radius: 6px;
-  cursor: pointer; width: auto; margin: 0; flex-shrink: 0;
+  padding: 3px 8px; font-size: 11px; border-radius: 6px;
+  cursor: pointer; margin-left: 8px; flex-shrink: 0;
 }
-.history-info { flex: 1; }
-.history-date { color: #888; font-size: 12px; }
-.history-amt { color: #fff; font-weight: 600; margin-right: 8px; }
+.empty { color: #555; font-size: 14px; text-align: center; padding: 12px 0; }
 </style>
 </head>
 <body>
@@ -41,7 +46,7 @@ input::placeholder { color: #777; }
   <input type="month" id="monthPicker" />
   <input type="date" id="date" />
   <input type="number" id="amount" placeholder="金額（¥）" />
-  <button onclick="addRecord()">追加</button>
+  <button class="add-btn" onclick="addRecord()">追加</button>
 
   <div class="card">
     <h3>今月の合計</h3>
@@ -49,34 +54,37 @@ input::placeholder { color: #777; }
   </div>
 
   <div class="card">
-    <h3>履歴</h3>
+    <h3>履歴（日別）</h3>
     <div id="list"></div>
   </div>
 </div>
 
 <script>
-let records = JSON.parse(localStorage.getItem('kakeibo_records') || '[]');
+let records = [];
+try { records = JSON.parse(localStorage.getItem('kakeibo_records') || '[]'); } catch(e) {}
 let selectedMonth = new Date();
 
-function save() { localStorage.setItem('kakeibo_records', JSON.stringify(records)); }
+function save() {
+  try { localStorage.setItem('kakeibo_records', JSON.stringify(records)); } catch(e) {}
+}
 
 function fmtDate(str) {
-  const d = new Date(str);
-  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+  const d = new Date(str + 'T00:00:00');
+  return `${d.getMonth()+1}月${d.getDate()}日`;
 }
 
 function addRecord() {
   const date = document.getElementById('date').value;
   const amount = Number(document.getElementById('amount').value);
   if (!date || !amount) { alert('日付と金額を入力してください'); return; }
-  records.push({ date, amount });
+  records.push({ date, amount, id: Date.now() + Math.random() });
   save();
   document.getElementById('amount').value = '';
   render();
 }
 
-function deleteRecord(idx) {
-  records.splice(idx, 1);
+function deleteRecord(id) {
+  records = records.filter(r => r.id !== id);
   save();
   render();
 }
@@ -84,40 +92,65 @@ function deleteRecord(idx) {
 function render() {
   const listEl = document.getElementById('list');
   listEl.innerHTML = '';
-  let monthlyTotal = 0;
   const year = selectedMonth.getFullYear();
   const month = selectedMonth.getMonth();
 
-  const filtered = records
-    .map((r, i) => ({ r, i }))
-    .filter(({ r }) => {
-      const d = new Date(r.date);
-      return d.getFullYear() === year && d.getMonth() === month;
-    })
-    .sort((a, b) => b.r.date.localeCompare(a.r.date));
-
-  filtered.forEach(({ r, i }) => {
-    const item = document.createElement('div');
-    item.className = 'history-item';
-    item.innerHTML = `
-      <div class="history-info">
-        <div class="history-date">${fmtDate(r.date)}</div>
-      </div>
-      <span class="history-amt">-¥${r.amount.toLocaleString()}</span>
-      <button class="del-btn" onclick="deleteRecord(${i})">削除</button>
-    `;
-    listEl.appendChild(item);
-    monthlyTotal += r.amount;
+  const filtered = records.filter(r => {
+    const d = new Date(r.date + 'T00:00:00');
+    return d.getFullYear() === year && d.getMonth() === month;
   });
 
+  const dayMap = {};
+  filtered.forEach(r => {
+    if (!dayMap[r.date]) dayMap[r.date] = [];
+    dayMap[r.date].push(r);
+  });
+
+  const monthlyTotal = filtered.reduce((s, r) => s + r.amount, 0);
   document.getElementById('monthlyTotal').textContent = `¥${monthlyTotal.toLocaleString()}`;
+
+  const sortedDates = Object.keys(dayMap).sort((a, b) => b.localeCompare(a));
+
+  if (sortedDates.length === 0) {
+    listEl.innerHTML = '<div class="empty">この月のデータはありません</div>';
+    return;
+  }
+
+  sortedDates.forEach(date => {
+    const items = dayMap[date];
+    const dayTotal = items.reduce((s, r) => s + r.amount, 0);
+    const block = document.createElement('div');
+    block.className = 'day-block';
+
+    let detailHTML = '';
+    if (items.length > 1) {
+      const sorted = [...items].sort((a, b) => b.amount - a.amount);
+      detailHTML = `<div class="detail-list">${sorted.map(r => `
+        <div class="detail-item">
+          <span>-¥${r.amount.toLocaleString()}</span>
+          <button class="del-btn" onclick="deleteRecord(${r.id})">削除</button>
+        </div>`).join('')}</div>`;
+    }
+
+    block.innerHTML = `
+      <div class="day-header">
+        <span>${fmtDate(date)}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="day-total">-¥${dayTotal.toLocaleString()}</span>
+          ${items.length === 1 ? `<button class="del-btn" onclick="deleteRecord(${items[0].id})">削除</button>` : ''}
+        </div>
+      </div>
+      ${detailHTML}
+    `;
+    listEl.appendChild(block);
+  });
 }
 
 const now = new Date();
 document.getElementById('date').valueAsDate = now;
 document.getElementById('monthPicker').value = now.toISOString().slice(0,7);
 document.getElementById('monthPicker').addEventListener('change', (e) => {
-  selectedMonth = new Date(e.target.value);
+  selectedMonth = new Date(e.target.value + '-01T00:00:00');
   render();
 });
 render();
